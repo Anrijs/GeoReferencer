@@ -30,3 +30,5 @@
 Click on **Show commands** to generate useful commands: 
 1. **src Image -> PNG commands** - Commands to remove borders. 
 2. **src MAP -> TIF commands** - generate GoeTIFF files from OZI map files
+
+## This is still a work-in progress tool
