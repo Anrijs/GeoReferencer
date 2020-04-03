@@ -17,7 +17,7 @@ function fixName(name) {
 /*
     Automatic coordinate detection for USSR/Genshtab O-Grid 1:100 000 maps
 */
-function getCoords_GenshtabC100k(name) {
+function getCoords_GenshtabO100k(name) {
     var parts = fixName(name).split("-");
     var nom_number = parts[0];
     var col_number = parseInt(parts[1]);
@@ -40,8 +40,8 @@ function getCoords_GenshtabC100k(name) {
 /*
     Automatic coordinate detection for USSR/Genshtab O-Grid 1:50 000 maps
 */
-function getCoords_GenshtabC50k(name) {
-    var bbox = getCoords_GenshtabC100k(name);
+function getCoords_GenshtabO50k(name) {
+    var bbox = getCoords_GenshtabO100k(name);
 
     var parts = fixName(name).split("-");
 
@@ -69,8 +69,8 @@ function getCoords_GenshtabC50k(name) {
 /*
     Automatic coordinate detection for USSR/Genshtab O-Grid 1:25 000 maps
 */
-function getCoords_GenshtabC25k(name) {
-    var bbox = getCoords_GenshtabC50k(name);
+function getCoords_GenshtabO25k(name) {
+    var bbox = getCoords_GenshtabO50k(name);
 
     var lat = bbox[1];
     var lon = bbox[0];
