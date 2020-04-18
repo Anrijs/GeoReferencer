@@ -383,23 +383,23 @@
             switch (active) {
                 case 1: 
                     $("#btn1").addClass("btn-active"); 
-                    wx = pt1pos[0] == -1 ? 0 : pt1pos[0] - w; 
-                    wy = pt1pos[1] == -1 ? 0 : pt1pos[1] - h;
+                    wx = pt1pos[0] < 0 ? 0 : pt1pos[0] - w; 
+                    wy = pt1pos[1] < 0 ? 0 : pt1pos[1] - h;
                     break;
                 case 2: 
                     $("#btn2").addClass("btn-active");
-                    wx = (pt2pos[0] == -1 ? image.width - pt1pos[0] : pt2pos[0]) - w; 
-                    wy = (pt2pos[1] == -1 ? pt1pos[1]               : pt2pos[1]) - h;
+                    wx = (pt2pos[0] < 0 ? image.width - pt1pos[0] : pt2pos[0]) - w; 
+                    wy = (pt2pos[1] < 0 ? pt1pos[1]               : pt2pos[1]) - h;
                     break;
                 case 3: 
                     $("#btn3").addClass("btn-active");
-                    wx = (pt3pos[0] == -1 ? pt2pos[0] : pt3pos[0]) - w; 
-                    wy = (pt3pos[1] == -1 ? image.height - pt2pos[1] : pt3pos[1]) - h;
+                    wx = (pt3pos[0] < 0 ? pt2pos[0] : pt3pos[0]) - w; 
+                    wy = (pt3pos[1] < 0 ? image.height - pt2pos[1] : pt3pos[1]) - h;
                     break;
                 case 4: 
                     $("#btn4").addClass("btn-active");
-                    wx = (pt4pos[0] == -1 ? pt1pos[0] : pt4pos[0]) - w; 
-                    wy = (pt4pos[1] == -1 ? pt3pos[1] : pt4pos[1]) - h;
+                    wx = (pt4pos[0] < 0 ? pt1pos[0] : pt4pos[0]) - w; 
+                    wy = (pt4pos[1] < 0 ? pt3pos[1] : pt4pos[1]) - h;
                     break;
             }
 
