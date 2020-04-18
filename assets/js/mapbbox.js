@@ -34,7 +34,7 @@ function getCoords_GenshtabO100k(name) {
     var x2 = x1 + 0.5;
     var y2 = y1 + 1/3.0;
 
-    return [x1,y1,x2,y2];
+    return [y2,x1,y1,x2];
 }
 
 /*
@@ -52,18 +52,18 @@ function getCoords_GenshtabO50k(name) {
     var letter = parts[3];
 
     if (letter == "1") {         //  a / a
-        bbox[1] += d_lat;
+        bbox[0] += d_lat;
     } else if (letter == "2") {  //  b / b
-        bbox[1] += d_lat;
-        bbox[0] += d_lon;
+        bbox[0] += d_lat;
+        bbox[1] += d_lon;
     } else if (letter == "4") {  //  d / g
-        bbox[0] += d_lon;
+        bbox[1] += d_lon;
     }
 
-    var lat = bbox[1];
-    var lon = bbox[0];
+    var lat = bbox[0];
+    var lon = bbox[1];
 
-    return [lon, lat, lon + d_lon, lat + d_lat];
+    return [lat, lon, lat + d_lat, lon + d_lon];
 }
 
 /*
@@ -72,8 +72,8 @@ function getCoords_GenshtabO50k(name) {
 function getCoords_GenshtabO25k(name) {
     var bbox = getCoords_GenshtabO50k(name);
 
-    var lat = bbox[1];
-    var lon = bbox[0];
+    var lat = bbox[0];
+    var lon = bbox[1];
 
     var parts = fixName(name).split("-");
 
@@ -94,7 +94,7 @@ function getCoords_GenshtabO25k(name) {
         lon += d_lon;
     }
 
-    return [lon, lat, lon + d_lon, lat + d_lat];
+    return [lat, lon, lat + d_lat, lon + d_lon];
 }
 
 /*
