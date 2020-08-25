@@ -18,7 +18,20 @@
                 $nomaps = TRUE;
             } else {
                 if (isset($_GET["sq"])) {
-                    $map = "maps/" . $maps[0];
+                    $idx = 0;
+
+                    if (isset($_GET["after"])) {
+                        $aft = $_GET["after"];
+                        foreach ($maps as $m) {
+                            if ($m == $aft) {
+                                ++$idx;
+                                break;
+                            }
+                            ++$idx;
+                        }
+                    }
+
+                    $map = "maps/" . $maps[$idx];
                 } else if (isset($_GET["rsq"])) {
                     $map = "maps/" . $maps[sizeof($maps)-1];
                 } else {
@@ -182,7 +195,7 @@
     var autoCoord = getCookie("autoCoord") == "true";
 
     if (autoCoord) {
-        autofillCoords()
+        autofillCoords();
     }
 
     var active = 1;
@@ -322,9 +335,19 @@
             {"x":pt3pos[0],"y":pt3pos[1],"lat":[$("#pointer3latdd")[0].value, $("#pointer3latmm")[0].value],"lon":[$("#pointer3londd")[0].value, $("#pointer3lonmm")[0].value]},
             {"x":pt4pos[0],"y":pt4pos[1],"lat":[$("#pointer4latdd")[0].value, $("#pointer4latmm")[0].value],"lon":[$("#pointer4londd")[0].value, $("#pointer4lonmm")[0].value]},
         ];
+
+        // fix minutes
+        for (var i=0;i<obje.length;i++) {
+            var obj = obje[i];
+            if(obj["lat"][1].length == 0) obj["lat"][1] = "0.0";
+            if(obj["lon"][1].length == 0) obj["lon"][1] = "0.0";
+
+            if(!obj["lat"][1].includes(".")) obj["lat"][1] += ".0";
+            if(!obj["lon"][1].includes(".")) obj["lon"][1] += ".0";
+        }
         
         $.post( "save.php", { 'points': obje, 'filename': baseName(image.src, false)}, function( data ) {
-            if (data == "OK") {
+            if (data.trim() == "OK") {
                 location.reload();
                 window.scrollTo(0, 0);
             } else {
@@ -409,12 +432,26 @@
         console.log("activated " + active);
     }
 
+    function fillPair(dst, lat_src, lon_src) {
+        if ($("#pointer" + dst + "latdd")[0].value == "") $("#pointer" + dst + "latdd")[0].value = $("#pointer" + lat_src + "latdd")[0].value;
+        if ($("#pointer" + dst + "latmm")[0].value == "") $("#pointer" + dst + "latmm")[0].value = $("#pointer" + lat_src + "latmm")[0].value;
+
+        if ($("#pointer" + dst + "londd")[0].value == "") $("#pointer" + dst + "londd")[0].value = $("#pointer" + lon_src + "londd")[0].value;
+        if ($("#pointer" + dst + "lonmm")[0].value == "") $("#pointer" + dst + "lonmm")[0].value = $("#pointer" + lon_src + "lonmm")[0].value;
+    }
+
     function nextMarker() {
         if (active >= 4 || active <= 0) {
             activateMarker(1);
         } else {
             activateMarker(active+1);            
         }
+
+        // autofill by siblings
+        fillPair(2, 1, 3);
+        fillPair(3, 4, 2);
+        fillPair(4, 3, 1);
+        fillPair(1, 2, 4);
     }
 
     function autofillCoords() {
@@ -422,7 +459,36 @@
         var filename = baseName("<?=$map;?>", false);
         var bbox = <?=CFG_AUTOCOORDS?>(filename);
 
+        if (bbox.length == 8) {
+            $("#pointer1latdd")[0].value = bbox[0][0];
+            $("#pointer1londd")[0].value = bbox[1][0];
+            $("#pointer1latmm")[0].value = bbox[0][1];
+            $("#pointer1lonmm")[0].value = bbox[1][1];
+
+            $("#pointer2latdd")[0].value = bbox[2][0];
+            $("#pointer2londd")[0].value = bbox[3][0];
+            $("#pointer2latmm")[0].value = bbox[2][1];
+            $("#pointer2lonmm")[0].value = bbox[3][1];
+
+            $("#pointer3latdd")[0].value = bbox[4][0];
+            $("#pointer3londd")[0].value = bbox[5][0];
+            $("#pointer3latmm")[0].value = bbox[4][1];
+            $("#pointer3lonmm")[0].value = bbox[5][1];
+
+            $("#pointer4latdd")[0].value = bbox[6][0];
+            $("#pointer4londd")[0].value = bbox[7][0];
+            $("#pointer4latmm")[0].value = bbox[6][1];
+            $("#pointer4lonmm")[0].value = bbox[7][1];
+            
+            return;
+        }
+
         // 3 0 1 2
+        var lat1 = bbox[0];
+        var lon1 = bbox[1];
+        var lat2 = bbox[2];
+        var lon2 = bbox[3];
+
         var lat1 = bbox[0];
         var lon1 = bbox[1];
         var lat2 = bbox[2];

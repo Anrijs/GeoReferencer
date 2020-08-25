@@ -18,20 +18,30 @@
 
 include "lib/fn.php";
 
-$maps = getDoneMaps();
+$maps = getDoneMaps(!isset($_GET["existing"]));
 
 $warnas = array();
 
 $ext = "png";
 if (isset($_GET["ext"])) {
     $ext = $_GET["ext"];
+    $scale = 1.0;
+
+    if (isset($_GET["scale"])) {
+        $scale = floatval($_GET["scale"]);
+    }
 
     $errors = array();
 
     echo "<a href=\"index.php\">Check status</a><br><br>";
 
     foreach ($maps as $map) {
-        $str = generateMapFile($map);
+        if (array_key_exists("igonre", $map)) {
+            if ($map["ignore"] == "true") {
+                continue;
+            }
+        }
+        $str = generateMapFile($map, $scale);
         $str = str_replace(".tif", ".$ext", $str);
 
         if (CFG_VALIDATE) {
@@ -64,6 +74,9 @@ if (isset($_GET["ext"])) {
     <form method="get">
         <label for="ext">Image file extension</label><br>
         <input type="text" id="ext" name="ext"><br>
+        <label for="scale">Image scale</label><br>
+        <input type="number" id="scale" name="scale" value="1.0"><br>
+        <input type="checkbox" id="existing" name="existing" checked><label for="existing">Only for existing images</label><br>
         <input type="submit">
     </form>
 <?php } ?>

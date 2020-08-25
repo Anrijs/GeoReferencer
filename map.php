@@ -5,6 +5,7 @@
     <title>Calibration map</title>
     <link rel="stylesheet" href="assets/css/leaflet.css" />
     <script src="assets/js/leaflet.js"></script>
+    <script src="assets/js/mapbbox.js"></script>
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js"></script>
 
     <style>
@@ -57,7 +58,7 @@ $('.leaflet-container').css('cursor','crosshair');
 <?php 
   require_once 'lib/fn.php';
 
-  $done = getDoneMaps();
+  $done = getDoneMaps(True);
   $boxnum = 0;
   $extra = "";
   foreach ($done as $map) {
@@ -70,14 +71,41 @@ $('.leaflet-container').css('cursor','crosshair');
       $polypts[] = "[".$ptlat.",".$ptlon."]";
     }
 
+    if ($map["missing"] == "1") {
+      $extra = ", color: 'orange, fillOpacity: 0.05'";
+    } else {
+      $extra = ", fillOpacity: 0.3";
+    }
+
     echo "var popupText = '<b>" . $map["name"] . "</b><br><a href=\"#\" onclick=\"bbox".$boxnum.".removeFrom(map);\">Hide</a> | <a href=\"calibrate.php?map=" . $map["name"] . "\">Edit</a>';"; 
     echo "var bbox" . $boxnum . " = L.polygon([";
     echo implode(",",$polypts);
-    echo"], {fillOpacity: 0.05, weight: 1.5 " . $extra . "}).bindTooltip(\"" . $map["name"] . "\", {direction:'center'}).bindPopup(popupText).addTo(map);";
+    echo"], {weight: 1.5 " . $extra . "}).bindTooltip(\"" . $map["name"] . "\", {direction:'center'}).bindPopup(popupText).addTo(map);";
 
     ++$boxnum;
   }
+
+  $incomplete = getIncompleteMaps();
+
+  $incompletestr = '"'. implode("\",\n\"", $incomplete) . '"';
+  echo "\nvar incomplete = [" . $incompletestr . "];";
 ?>
+
+function drawIncomplete() {
+  for (var i=0;i<incomplete.length;i++) {
+    var name = incomplete[i];
+    var bbox = <?=CFG_AUTOCOORDS?>(name);
+
+    var popupText = '<b>' + name + '</b><br><a href="calibrate.php?map=' + name + '">Edit</a>';
+    var polyh = L.polygon([
+      [bbox[0], bbox[1]],
+      [bbox[0], bbox[3]],
+      [bbox[2], bbox[3]],
+      [bbox[2], bbox[1]]
+    ], {fillOpacity: 0.05, opacity: 0.5, weight: 1.0, color: 'gray' }).bindTooltip(name, {direction:'center'}).bindPopup(popupText).addTo(map);
+  }
+}
+drawIncomplete();
 
 </script>
 

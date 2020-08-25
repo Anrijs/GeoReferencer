@@ -101,7 +101,7 @@ function migrateDoneMaps($version) {
 /*
     Returns calibrated map list with calibration
 */
-function getDoneMaps() {
+function getDoneMaps($missing=False) {
     $done = array();
     $maps = getMaps();
 
@@ -117,7 +117,16 @@ function getDoneMaps() {
             return getDoneMaps();
         }
 
-        if (!in_array($obj["name"],$maps)) continue;
+
+        $obj["missing"] = "0";
+
+        if (!in_array($obj["name"],$maps)) {
+            if ($missing) {
+                $obj["missing"] = "1";
+            } else {
+                continue;
+            }
+        }
 
         $dstcoords = array();
 
@@ -189,13 +198,13 @@ function validateCoords($map) {
     return $errors;
 }
 
-function getCmds() {
+function getCmds($scale=1.0) {
     $maps = getDoneMaps();
 
     $cmds = array();
 
     foreach ($maps as $map) {
-        $cmd = getToPngCmd($map);
+        $cmd = getToPngCmd($map, $scale);
         $cmds[] = $cmd;
     }
     
@@ -211,7 +220,7 @@ function getToTifCmd($map) {
     return "gdal_translate -of GTiff " . escapeshellarg($mapname . ".map") . " " . escapeshellarg($sane . ".tif");
 }
 
-function getToPngCmd($map, $srcname=FALSE, $dstname=FALSE) {
+function getToPngCmd($map, $scale=1.0, $srcname=FALSE, $dstname=FALSE) {
     $name = $map["name"];
 
     if ($srcname) {
@@ -222,15 +231,15 @@ function getToPngCmd($map, $srcname=FALSE, $dstname=FALSE) {
 
     $pts = "";
 
-    $map["points"][0]["x"] = $map["points"][0]["x"] - CFG_PNG_PADDING;
-    $map["points"][0]["y"] = $map["points"][0]["y"] - CFG_PNG_PADDING;
-    $map["points"][1]["x"] = $map["points"][1]["x"] + CFG_PNG_PADDING;
-    $map["points"][1]["y"] = $map["points"][1]["y"] - CFG_PNG_PADDING;
-    $map["points"][2]["x"] = $map["points"][2]["x"] + CFG_PNG_PADDING;
-    $map["points"][2]["y"] = $map["points"][2]["y"] + CFG_PNG_PADDING;
-    $map["points"][3]["x"] = $map["points"][3]["x"] - CFG_PNG_PADDING;
-    $map["points"][3]["y"] = $map["points"][3]["y"] + CFG_PNG_PADDING;
-    
+    $map["points"][0]["x"] = ($map["points"][0]["x"] * $scale) - CFG_PNG_PADDING;
+    $map["points"][0]["y"] = ($map["points"][0]["y"] * $scale) - CFG_PNG_PADDING;
+    $map["points"][1]["x"] = ($map["points"][1]["x"] * $scale) + CFG_PNG_PADDING;
+    $map["points"][1]["y"] = ($map["points"][1]["y"] * $scale) - CFG_PNG_PADDING;
+    $map["points"][2]["x"] = ($map["points"][2]["x"] * $scale) + CFG_PNG_PADDING;
+    $map["points"][2]["y"] = ($map["points"][2]["y"] * $scale) + CFG_PNG_PADDING;
+    $map["points"][3]["x"] = ($map["points"][3]["x"] * $scale) - CFG_PNG_PADDING;
+    $map["points"][3]["y"] = ($map["points"][3]["y"] * $scale) + CFG_PNG_PADDING;
+
     foreach ($map["points"] as $pt) {
         $pts .= $pt["x"] . "," . $pt["y"] . " ";
     }
@@ -249,6 +258,141 @@ function getToPngCmd($map, $srcname=FALSE, $dstname=FALSE) {
 
     return $cmd;
 }
+
+function getWarpCmd($map, $scale=1.0, $srcname=FALSE, $dstname=FALSE) {
+    $name = $map["name"];
+    if (!$map["corners"] || sizeof($map["warp"]) < 4) {
+        return "# missing warp data for $name";
+    }
+    if ($srcname) {
+        $name = $srcname;
+    }
+    $h = $map["warp"]["srch"];
+    $w = $map["warp"]["srcw"];
+    $defpts = array(
+        array(0,0),
+        array($w,0),
+        array($w,$h),
+        array(0,$h)
+    );
+    
+    $cutline = "";
+    $isdef = true;
+    foreach ($map["cutline"] as $cut) {
+        if (!in_array($cut, $defpts)) {
+            $isdef = false;
+        }
+        $cutline .= $cut[1] . ',' . $cut[0]. ' ';
+    }
+    $maskcmd = " \( +clone -fill Black -colorize 100 -fill White -draw \"polygon ".$cutline." \" \) -alpha off -compose CopyOpacity -composite +repage";
+    if ($isdef) {
+        $maskcmd = "";
+    }
+    $cmd = "convert " . escapeshellarg($name) . $maskcmd . " +profile \"icc\" -colorspace srgb -type TrueColorAlpha -virtual-pixel background -background transparent +distort Perspective ";
+    $distort = "";
+    $gcps = "";
+    $offsetx = intval($map["warp"]["offsetx"]);
+    $offsety = intval($map["warp"]["offsety"]);
+    $pt1lat = intval($map["points"][0]["lat"][0]) + (floatval($map["points"][0]["lat"][1]) / 60);
+    $pt1lon = intval($map["points"][0]["lon"][0]) + (floatval($map["points"][0]["lon"][1]) / 60);    
+    $pt2lat = intval($map["points"][1]["lat"][0]) + (floatval($map["points"][1]["lat"][1]) / 60);
+    $pt2lon = intval($map["points"][1]["lon"][0]) + (floatval($map["points"][1]["lon"][1]) / 60);    
+    $pt3lat = intval($map["points"][2]["lat"][0]) + (floatval($map["points"][2]["lat"][1]) / 60);
+    $pt3lon = intval($map["points"][2]["lon"][0]) + (floatval($map["points"][2]["lon"][1]) / 60);    
+    $pt4lat = intval($map["points"][3]["lat"][0]) + (floatval($map["points"][3]["lat"][1]) / 60);
+    $pt4lon = intval($map["points"][3]["lon"][0]) + (floatval($map["points"][3]["lon"][1]) / 60);
+    $x1 = ($map["warp"]["points"][0]["dst"][0] - $offsetx) * $scale;
+    $y1 = ($map["warp"]["points"][0]["dst"][1] - $offsety) * $scale;
+    $x2 = ($map["warp"]["points"][($firstid + 1) % 4]["dst"][0] - $offsetx) * $scale;
+    $y2 = ($map["warp"]["points"][($firstid + 1) % 4]["dst"][1] - $offsety) * $scale;
+    $x3 = ($map["warp"]["points"][($firstid + 2) % 4]["dst"][0] - $offsetx) * $scale;
+    $y3 = ($map["warp"]["points"][($firstid + 2) % 4]["dst"][1] - $offsety) * $scale;
+    $x4 = ($map["warp"]["points"][($firstid + 3) % 4]["dst"][0] - $offsetx) * $scale;
+    $y4 = ($map["warp"]["points"][($firstid + 3) % 4]["dst"][1] - $offsety) * $scale;
+    $gcps .= "-gcp " . $x1 . " " . $y1 . " " . $pt1lon . " " . $pt1lat . " ";
+    $gcps .= "-gcp " . $x2 . " " . $y2 . " " . $pt2lon . " " . $pt2lat . " ";
+    $gcps .= "-gcp " . $x3 . " " . $y3 . " " . $pt3lon . " " . $pt3lat . " ";
+    $gcps .= "-gcp " . $x4 . " " . $y4 . " " . $pt4lon . " " . $pt4lat . " ";
+    foreach ($map["warp"]["points"] as $pt) {
+        $distort .= ($pt["src"][0] * $scale) . "," . ($pt["src"][1] * $scale) . " ";
+        $distort .= (($pt["dst"][0] - $offsetx) * $scale) . "," . (($pt["dst"][1] - $offsety) * $scale) . " ";
+    }
+    if ($dstname) {
+        $mapname = $dstname;
+    } else {
+        $mapname = preg_replace('/\\.[^.\\s]{3,4}$/', '', $map["name"]);
+    }
+    
+    $cmd .= " '" . $distort . "' -quality 1 " . escapeshellarg($mapname . '.png');
+    $cmd2 = "gdal_translate -of GTiff " . $gcps .  " " . escapeshellarg($mapname . '.png') . " " .escapeshellarg($mapname . '.tif');
+    
+    return array($cmd, $cmd2);
+}
+/**
+ * Calculates the great-circle distance between two points, with
+ * the Haversine formula.
+ * @param float $latitudeFrom Latitude of start point in [deg decimal]
+ * @param float $longitudeFrom Longitude of start point in [deg decimal]
+ * @param float $latitudeTo Latitude of target point in [deg decimal]
+ * @param float $longitudeTo Longitude of target point in [deg decimal]
+ * @param float $earthRadius Mean earth radius in [m]
+ * @return float Distance between points in [m] (same as earthRadius)
+ */
+function haversineGreatCircleDistance(
+    $latitudeFrom, $longitudeFrom, $latitudeTo, $longitudeTo, $earthRadius = 6371000) {
+    // convert from degrees to radians
+    $latFrom = deg2rad($latitudeFrom);
+    $lonFrom = deg2rad($longitudeFrom);
+    $latTo = deg2rad($latitudeTo);
+    $lonTo = deg2rad($longitudeTo);
+    $latDelta = $latTo - $latFrom;
+    $lonDelta = $lonTo - $lonFrom;
+    $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) +
+    cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
+    return $angle * $earthRadius;
+}
+
+// Works only if corner mode is enabled
+function cmpMapArea($a, $b) {
+    $area = 0;
+    
+    if ($a["corners"] == "false" || $b["corners"] == "false") {
+        return -1;
+    }
+    $lat0 = floatval($a["points"][0]["dstlat"][0]) + (floatval($a["points"][0]["dstlat"][1]) / 60);
+    $lon0 = floatval($a["points"][0]["dstlon"][0]) + (floatval($a["points"][0]["dstlon"][1]) / 60);
+    $lat1 = floatval($a["points"][1]["dstlat"][0]) + (floatval($a["points"][1]["dstlat"][1]) / 60);
+    $lon1 = floatval($a["points"][1]["dstlon"][0]) + (floatval($a["points"][1]["dstlon"][1]) / 60);
+    $lat2 = floatval($a["points"][2]["dstlat"][0]) + (floatval($a["points"][2]["dstlat"][1]) / 60);
+    $lon2 = floatval($a["points"][2]["dstlon"][0]) + (floatval($a["points"][2]["dstlon"][1]) / 60);
+    $lat3 = floatval($a["points"][3]["dstlat"][0]) + (floatval($a["points"][3]["dstlat"][1]) / 60);
+    $lon3 = floatval($a["points"][3]["dstlon"][0]) + (floatval($a["points"][3]["dstlon"][1]) / 60);
+    $top = haversineGreatCircleDistance($lat0, $lon0, $lat1, $lon1);
+    $right = haversineGreatCircleDistance($lat1, $lon1, $lat2, $lon2);
+    $bottom = haversineGreatCircleDistance($lat2, $lon2, $lat3, $lon3);
+    $left = haversineGreatCircleDistance($lat3, $lon3, $lat0, $lon0);
+    $maxtb = max($top, $bottom);
+    $maxlr = max($left, $right);
+    $areaa = $maxlr * $maxtb;
+////////
+    $lat0 = floatval($b["points"][0]["dstlat"][0]) + (floatval($b["points"][0]["dstlat"][1]) / 60);
+    $lon0 = floatval($b["points"][0]["dstlon"][0]) + (floatval($b["points"][0]["dstlon"][1]) / 60);
+    $lat1 = floatval($b["points"][1]["dstlat"][0]) + (floatval($b["points"][1]["dstlat"][1]) / 60);
+    $lon1 = floatval($b["points"][1]["dstlon"][0]) + (floatval($b["points"][1]["dstlon"][1]) / 60);
+    $lat2 = floatval($b["points"][2]["dstlat"][0]) + (floatval($b["points"][2]["dstlat"][1]) / 60);
+    $lon2 = floatval($b["points"][2]["dstlon"][0]) + (floatval($b["points"][2]["dstlon"][1]) / 60);
+    $lat3 = floatval($b["points"][3]["dstlat"][0]) + (floatval($b["points"][3]["dstlat"][1]) / 60);
+    $lon3 = floatval($b["points"][3]["dstlon"][0]) + (floatval($b["points"][3]["dstlon"][1]) / 60);
+    $top = haversineGreatCircleDistance($lat0, $lon0, $lat1, $lon1);
+    $right = haversineGreatCircleDistance($lat1, $lon1, $lat2, $lon2);
+    $bottom = haversineGreatCircleDistance($lat2, $lon2, $lat3, $lon3);
+    $left = haversineGreatCircleDistance($lat3, $lon3, $lat0, $lon0);
+    $maxtb = max($top, $bottom);
+    $maxlr = max($left, $right);
+    $areab = $maxlr * $maxtb;
+    return $areab - $areaa;
+}
+
 
 function oziPointLine($num, $x, $y, $latdd, $latmm, $pole, $londd, $lonmm, $hemi) {
     $fnum = $num;
@@ -271,7 +415,7 @@ function oziMPLLLine($num, $latdd, $latmm, $pole, $londd, $lonmm, $hemi) {
 }
 
 // doneMap, lut
-function generateMapFile($map) {
+function generateMapFile($map, $scale=1.0) {
     $template = 'OziExplorer Map Data File Version 2.2
 {FILENAME}
 {FILENAME}
@@ -304,12 +448,47 @@ MMPNUM,{MPNUMCOUNT}
     $mpxylines = array();
     $mplllines = array();
 
+    $corners = $map["corners"] == "true";
+    $offsetx = 0;
+    $offset = 0;
+    if ($corners) {
+        $offsetx = intval($map["warp"]["offsetx"]);
+        $offsety = intval($map["warp"]["offsety"]);
+    }
+
+    // anchors
+    $lata = 0;
+    $lona = 0;
+    $latstep = 0.0;
+    $lonstep = 0.0;
+    
     $i = 0;
     while (++$i <= 4) {
+        $xyarr = $corners ? $map["warp"]["points"] : $map["points"];
+        if (!array_key_exists($i-1,$xyarr)) {
+            continue;
+        }
+
         $latdd = $map["points"][$i-1]["dstlat"][0];
         $latmm = $map["points"][$i-1]["dstlat"][1];
         $londd = $map["points"][$i-1]["dstlon"][0];
         $lonmm = $map["points"][$i-1]["dstlon"][1];
+
+        $lat = $latdd + ($latmm / 60);
+        $lon = $londd + ($lonmm / 60);
+
+        $latdt = $lat - (($lat - $lata) * $latstep);
+        $londt = $lon - (($lon - $lona) * $lonstep);
+
+        $latdd = floor($latdt);
+        $latmm = ($latdt - $latdd) * 60;
+        $londd = floor($londt);
+        $lonmm = ($londt - $londd) * 60;
+
+        $map["points"][$i-1]["dstlat"][0] = $latdd;
+        $map["points"][$i-1]["dstlat"][1] = $latmm;
+        $map["points"][$i-1]["dstlon"][0] = $londd;
+        $map["points"][$i-1]["dstlon"][1] = $lonmm;
 
         $pole = "N";
         $hemi = "E";
@@ -324,8 +503,13 @@ MMPNUM,{MPNUMCOUNT}
             $londd = -$londd;
         }
 
-        $ptx = $map["points"][$i-1]["x"];
-        $pty = $map["points"][$i-1]["y"];
+        $ptx = $map["points"][$i-1]["x"] * $scale;
+        $pty = $map["points"][$i-1]["y"] * $scale;
+
+        if ($corners) {
+            $ptx = ($map["warp"]["points"][$i-1]["dst"][0] - $offsetx + 1) * $scale;
+            $pty = ($map["warp"]["points"][$i-1]["dst"][1] - $offsety + 1) * $scale;
+        }
 
         // Calibration points
         $ptlines[] = oziPointLine($i,$ptx,$pty,$latdd,$latmm,$pole,$londd,$lonmm,$hemi);
@@ -339,7 +523,7 @@ MMPNUM,{MPNUMCOUNT}
 
     $str = str_replace("{MPNUMCOUNT}",sizeof($mpxylines),$str);
     $str = str_replace("{MPNUMS}",$mpsstr,$str);
-    $str = str_replace("{POINTS}",$ptsstr.".tif",$str);
+    $str = str_replace("{POINTS}",$ptsstr,$str);
 
     return $str;
 }

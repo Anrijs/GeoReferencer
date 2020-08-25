@@ -17,7 +17,7 @@
         if (CFG_VALIDATE) {
             $ptid = 1;
             foreach ($points as $pt) {
-                if ($pt["x"] == -1 && $pt["y"] == -1) {
+                if ($pt["x"] <= 1 && $pt["y"] <= -1) {
                     die("invalid calibration point #${ptid} location");
                     return;
                 }
@@ -33,7 +33,7 @@
             }
         }
 
-        $maps = getDoneMaps();
+        $maps = getDoneMaps(True);
         $exists = FALSE;
 
         $obj = array(

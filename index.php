@@ -78,7 +78,8 @@
 
             $donecount = sizeof($done) . "/" . sizeof($maps);
 
-            echo "<h3><a href=\"calibrate.php\">Start calibrating maps</a></h3><br>";
+            echo "<h3><a href=\"calibrate.php\">Start calibrating maps</a></h3>";
+            echo "<small><a href=\"calibrate.php?sq\">sq</a> | <a href=\"calibrate.php?rsq\">rsq</a></small><br><br>";
             echo "<a href=\"mkmap.php\">Generate .map files</a><br><br>";
             /*if (TrueCFG_FILE_MODIFY_ALLOWED)*/ echo "<a href=\"upload.php\">Upload map images</a><br><br>";
             echo "<a href=\"map.php\">View calibration bbox in map</a><br>";
@@ -166,12 +167,18 @@
             echo "<hr class=\"alt\">";
 
             if (isset($_GET["cmds"])) {
+                $scale = 1.0;
+
+                if (isset($_GET["scale"])) {
+                    $scale = floatval($_GET["scale"]);
+                }
+
                 foreach ($done as $don) {
                     $name = preg_replace('/\\.[^.\\s]{3,4}$/', '', $don["name"]);
                     $parts = explode(" ",$name);
                     $sane = $parts[0];
     
-                    $readyPngCmds[] = getToPngCmd($don, FALSE, "pngs/" . $sane);
+                    $readyPngCmds[] = getToPngCmd($don, $scale, FALSE, "pngs/" . $sane);
                     $readTifCmds[] = getToTifCmd($don);
                 }
 
