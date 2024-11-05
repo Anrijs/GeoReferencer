@@ -8,6 +8,7 @@ require_once dirname(__FILE__) . '/../config.php';
 function getMaps() {
     $maps = array();
     $files = scandir("maps");
+    natsort($files);
     foreach ($files as $f) {
         $parts = explode(".", $f);
         $ext = strtolower(end($parts));
@@ -133,8 +134,8 @@ function getDoneMaps($missing=False) {
         foreach ($obj["points"] as $key => $c) {
             $coord = $c;
 
-            $dstlat = array($c["lat"][0],$c["lat"][1]);
-            $dstlon = array($c["lon"][0],$c["lon"][1]);
+            $dstlat = array(floatval($c["lat"][0]),floatval($c["lat"][1]));
+            $dstlon = array(floatval($c["lon"][0]),floatval($c["lon"][1]));
 
             if (CFG_COORD_FORMAT == "D") { // must be degree decimals, right?
                 $dstlat[1] = floatval("0." . $dstlat[1]) * 60;
@@ -231,14 +232,16 @@ function getToPngCmd($map, $scale=1.0, $srcname=FALSE, $dstname=FALSE) {
 
     $pts = "";
 
-    $map["points"][0]["x"] = ($map["points"][0]["x"] * $scale) - CFG_PNG_PADDING;
-    $map["points"][0]["y"] = ($map["points"][0]["y"] * $scale) - CFG_PNG_PADDING;
-    $map["points"][1]["x"] = ($map["points"][1]["x"] * $scale) + CFG_PNG_PADDING;
-    $map["points"][1]["y"] = ($map["points"][1]["y"] * $scale) - CFG_PNG_PADDING;
-    $map["points"][2]["x"] = ($map["points"][2]["x"] * $scale) + CFG_PNG_PADDING;
-    $map["points"][2]["y"] = ($map["points"][2]["y"] * $scale) + CFG_PNG_PADDING;
-    $map["points"][3]["x"] = ($map["points"][3]["x"] * $scale) - CFG_PNG_PADDING;
-    $map["points"][3]["y"] = ($map["points"][3]["y"] * $scale) + CFG_PNG_PADDING;
+    $padding = CFG_PNG_PADDING;
+
+    $map["points"][0]["x"] = ($map["points"][0]["x"] * $scale) - $padding;
+    $map["points"][0]["y"] = ($map["points"][0]["y"] * $scale) - $padding;
+    $map["points"][1]["x"] = ($map["points"][1]["x"] * $scale) + $padding;
+    $map["points"][1]["y"] = ($map["points"][1]["y"] * $scale) - $padding;
+    $map["points"][2]["x"] = ($map["points"][2]["x"] * $scale) + $padding;
+    $map["points"][2]["y"] = ($map["points"][2]["y"] * $scale) + $padding;
+    $map["points"][3]["x"] = ($map["points"][3]["x"] * $scale) - $padding;
+    $map["points"][3]["y"] = ($map["points"][3]["y"] * $scale) + $padding;
 
     foreach ($map["points"] as $pt) {
         $pts .= $pt["x"] . "," . $pt["y"] . " ";
@@ -261,7 +264,7 @@ function getToPngCmd($map, $scale=1.0, $srcname=FALSE, $dstname=FALSE) {
 
 function getWarpCmd($map, $scale=1.0, $srcname=FALSE, $dstname=FALSE) {
     $name = $map["name"];
-    if (!$map["corners"] || sizeof($map["warp"]) < 4) {
+    if (!isset($map["corners"]) || !isset($map["warp"]) || sizeof($map["warp"]) < 4) {
         return "# missing warp data for $name";
     }
     if ($srcname) {
@@ -271,10 +274,16 @@ function getWarpCmd($map, $scale=1.0, $srcname=FALSE, $dstname=FALSE) {
     $w = $map["warp"]["srcw"];
     $defpts = array(
         array(0,0),
-        array($w,0),
-        array($w,$h),
-        array(0,$h)
+        array($w-1,0),
+        array($w-1,$h-1),
+        array(0,$h-1),
+        array($h-1,0),
+        array($h-1,$w-1),
+        array(0,$w-1)
     );
+
+    $padding = CFG_PNG_PADDING;
+    $blur =    CFG_PNG_PADDING;
     
     $cutline = "";
     $isdef = true;
@@ -282,9 +291,26 @@ function getWarpCmd($map, $scale=1.0, $srcname=FALSE, $dstname=FALSE) {
         if (!in_array($cut, $defpts)) {
             $isdef = false;
         }
-        $cutline .= $cut[1] . ',' . $cut[0]. ' ';
+
+        $cutx = $cut[1];
+        $cuty = $cut[0];
+
+        if ($cutx < ($w/2)) {
+            $cutx += $padding;
+        } else {
+            $cutx -= $padding;
+        }
+
+        if ($cuty < ($h/2)) {
+            $cuty += $padding;
+        } else {
+            $cuty -= $padding;
+        }
+
+        $cutline .= $cutx . ',' . $cuty. ' ';
     }
-    $maskcmd = " \( +clone -fill Black -colorize 100 -fill White -draw \"polygon ".$cutline." \" \) -alpha off -compose CopyOpacity -composite +repage";
+    
+    $maskcmd = " \( +clone -fill Black -colorize 100 -fill White -draw \"polygon ".$cutline." \"    \) -alpha off -compose CopyOpacity -composite +repage";
     if ($isdef) {
         $maskcmd = "";
     }
@@ -414,8 +440,8 @@ function oziMPLLLine($num, $latdd, $latmm, $pole, $londd, $lonmm, $hemi) {
     return "MMPLL,$num,$mmlat,$mmlon";
 }
 
-// doneMap, lut
-function generateMapFile($map, $scale=1.0) {
+// doneMap, lut0
+function generateMapFile($map, $scale=1.0, $warped=True) {
     $template = 'OziExplorer Map Data File Version 2.2
 {FILENAME}
 {FILENAME}
@@ -439,7 +465,17 @@ MMPNUM,{MPNUMCOUNT}
 
     $name = preg_replace('/\\.[^.\\s]{3,4}$/', '', $map["name"]);
 
-    $str = str_replace("{FILENAME}",$name.".tif",$template);
+    $postfix = "";
+    if (isset($map['postfix'])) {
+        $postfix = $map['postfix'];
+        if (strlen($postfix) < 1) {
+            $postfix = "";
+        } else {
+            $postfix = "_" . $postfix;
+        }
+    }
+
+    $str = str_replace("{FILENAME}",$name . $postfix . ".tif",$template);
 
     $mmpadding = 0;
     $mmstr = $mmtemplate;
@@ -448,7 +484,7 @@ MMPNUM,{MPNUMCOUNT}
     $mpxylines = array();
     $mplllines = array();
 
-    $corners = $map["corners"] == "true";
+    $corners = $map["corners"] == "true" && $warped;
     $offsetx = 0;
     $offset = 0;
     if ($corners) {
@@ -480,6 +516,9 @@ MMPNUM,{MPNUMCOUNT}
         $latdt = $lat - (($lat - $lata) * $latstep);
         $londt = $lon - (($lon - $lona) * $lonstep);
 
+        $latdt += CFG_OFFSET_LAT;
+        $londt += CFG_OFFSET_LON;
+
         $latdd = floor($latdt);
         $latmm = ($latdt - $latdd) * 60;
         $londd = floor($londt);
@@ -507,8 +546,8 @@ MMPNUM,{MPNUMCOUNT}
         $pty = $map["points"][$i-1]["y"] * $scale;
 
         if ($corners) {
-            $ptx = ($map["warp"]["points"][$i-1]["dst"][0] - $offsetx + 1) * $scale;
-            $pty = ($map["warp"]["points"][$i-1]["dst"][1] - $offsety + 1) * $scale;
+            $ptx = ($map["warp"]["points"][$i-1]["dst"][0] - $offsetx) * $scale;
+            $pty = ($map["warp"]["points"][$i-1]["dst"][1] - $offsety) * $scale;
         }
 
         // Calibration points
@@ -524,8 +563,45 @@ MMPNUM,{MPNUMCOUNT}
     $str = str_replace("{MPNUMCOUNT}",sizeof($mpxylines),$str);
     $str = str_replace("{MPNUMS}",$mpsstr,$str);
     $str = str_replace("{POINTS}",$ptsstr,$str);
-
+    
     return $str;
+}
+
+function generateGcpFile($map, $scale=1.0) {
+    $lines = array();
+    $lines[] = '#CRS: GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]]';
+    $lines[] = 'mapX,mapY,pixelX,pixelY,enable';
+
+    $i = 0;
+    while (++$i <= 4) {
+        $xyarr = $corners ? $map["warp"]["points"] : $map["points"];
+        if (!array_key_exists($i-1,$xyarr)) {
+            continue;
+        }
+
+        $latdd = $map["points"][$i-1]["dstlat"][0];
+        $latmm = $map["points"][$i-1]["dstlat"][1];
+
+        $londd = $map["points"][$i-1]["dstlon"][0];
+        $lonmm = $map["points"][$i-1]["dstlon"][1];
+
+        $lat = $latdd + ($latmm / 60);
+        $lon = $londd + ($lonmm / 60);
+
+        $ptx = $map["points"][$i-1]["x"] * $scale;
+        $pty = $map["points"][$i-1]["y"] * $scale;
+
+        if ($corners) {
+            $ptx = ($map["warp"]["points"][$i-1]["dst"][0] - $offsetx) * $scale;
+            $pty = ($map["warp"]["points"][$i-1]["dst"][1] - $offsety) * $scale;
+        }
+
+        $pty = -$pty;
+
+        $lines[] = "$lon,$lat,$ptx,$pty,1";
+    }
+
+    return implode("\n", $lines);
 }
 
 /*

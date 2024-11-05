@@ -5,7 +5,7 @@
     <title>Calibration map</title>
     <link rel="stylesheet" href="assets/css/leaflet.css" />
     <script src="assets/js/leaflet.js"></script>
-    <script src="assets/js/mapbbox.js"></script>
+    <script src="border.js"></script>
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js"></script>
 
     <style>
@@ -44,12 +44,15 @@ var baseMaps = {
 };
 
 var map = L.map('map', {maxZoom:22}).setView([56.75,24], 8);
+var lyr = L.tileLayer("https://geotiff.anrijs.lv/corona/{z}/{x}/{y}.png", { maxNativeZoom: 15, detectRetina: false})
 
 baseMaps["OSM"].addTo(map);
 
 var overlayMaps = {
-  // add your own ovelays...
-};
+    "CORONA preview": L.tileLayer("https://geotiff.anrijs.lv/corona3/{z}/{x}/{y}.png", { maxNativeZoom: 15, detectRetina: false}),
+    "NARA preview": L.tileLayer("https://tiles.anrijs.lv/aerofoto_1940/{z}/{x}/{y}.png", { maxNativeZoom: 17, detectRetina: false}),
+    "NARA preview veer2": L.tileLayer("https://geotiff.anrijs.lv/aerover3/{z}/{x}/{y}.png", { maxNativeZoom: 17, detectRetina: false}),
+ };
 
 L.control.layers(baseMaps, overlayMaps).addTo(map);
 
@@ -71,41 +74,55 @@ $('.leaflet-container').css('cursor','crosshair');
       $polypts[] = "[".$ptlat.",".$ptlon."]";
     }
 
-    if ($map["missing"] == "1") {
-      $extra = ", color: 'orange, fillOpacity: 0.05'";
-    } else {
-      $extra = ", fillOpacity: 0.3";
+    $calibtool = "calibrate.php";
+    if (array_key_exists("corners", $map) && $map["corners"]) {
+        $calibtool = "calibrate2.php";
     }
 
-    echo "var popupText = '<b>" . $map["name"] . "</b><br><a href=\"#\" onclick=\"bbox".$boxnum.".removeFrom(map);\">Hide</a> | <a href=\"calibrate.php?map=" . $map["name"] . "\">Edit</a>';"; 
+    echo "var popupText = '<b>" . $map["name"] . "</b><br><a href=\"#\" onclick=\"bbox".$boxnum.".removeFrom(map);\">Hide</a> | <a href=\"" . $calibtool . "?map=" . $map["name"] . "\">Edit</a>';"; 
     echo "var bbox" . $boxnum . " = L.polygon([";
     echo implode(",",$polypts);
-    echo"], {weight: 1.5 " . $extra . "}).bindTooltip(\"" . $map["name"] . "\", {direction:'center'}).bindPopup(popupText).addTo(map);";
+    echo"], {fillOpacity: 0.05, weight: 1.5 " . $extra . "}).bindTooltip(\"" . $map["name"] . "\", {direction:'center'}).bindPopup(popupText).addTo(map);";
 
     ++$boxnum;
   }
-
-  $incomplete = getIncompleteMaps();
-
-  $incompletestr = '"'. implode("\",\n\"", $incomplete) . '"';
-  echo "\nvar incomplete = [" . $incompletestr . "];";
 ?>
 
-function drawIncomplete() {
-  for (var i=0;i<incomplete.length;i++) {
-    var name = incomplete[i];
-    var bbox = <?=CFG_AUTOCOORDS?>(name);
-
-    var popupText = '<b>' + name + '</b><br><a href="calibrate.php?map=' + name + '">Edit</a>';
-    var polyh = L.polygon([
-      [bbox[0], bbox[1]],
-      [bbox[0], bbox[3]],
-      [bbox[2], bbox[3]],
-      [bbox[2], bbox[1]]
-    ], {fillOpacity: 0.05, opacity: 0.5, weight: 1.0, color: 'gray' }).bindTooltip(name, {direction:'center'}).bindPopup(popupText).addTo(map);
-  }
+function showBorder() {
+  L.geoJSON(geoborder, {color: "white", weight: 2}).addTo(map);
 }
-drawIncomplete();
+
+function showSquares() {
+        var xrange = [20,29];
+        var yrange = [55,59];
+
+        L.polyline([
+            [yrange[0],xrange[0]],
+            [yrange[0],xrange[1]],
+            [yrange[1],xrange[1]],
+            [yrange[1],xrange[0]],
+            [yrange[0],xrange[0]],
+        ], {color: 'white', opacity: 0.75, weight: 2}).addTo(map);
+
+        for (var x=xrange[0];x<xrange[1];x++) {
+            L.polyline([
+                [yrange[0],x],
+                [yrange[1],x],
+            ], {color: 'white', opacity: 0.75, weight: 2}).addTo(map);
+
+            L.polyline([
+                [yrange[0],x+0.5],
+                [yrange[1],x+0.5],
+            ], {color: 'white', opacity: 0.75, weight: 1}).addTo(map);
+        }
+
+        for (var y=yrange[0];y<yrange[1];y++) {
+            L.polyline([
+                [y,xrange[0]],
+                [y,xrange[1]],
+            ], {color: 'white', opacity: 0.75, weight: 2}).addTo(map);
+        }
+    }
 
 </script>
 

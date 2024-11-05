@@ -7,10 +7,12 @@
         $pointerCount = 4;
 
         $map = FALSE;
+        $rawmap = "";
         $left = 0;
         
         if (isset($_GET["map"])) {
             $map = "maps/" . $_GET["map"];
+            $rawmap = $_GET["map"];
         } else {
             $maps = getIncompleteMaps();
             $left = sizeof($maps);
@@ -31,10 +33,13 @@
                         }
                     }
 
+                    $rawmap = $maps[$idx];
                     $map = "maps/" . $maps[$idx];
                 } else if (isset($_GET["rsq"])) {
+                    $rawmap = $maps[sizeof($maps)-1];
                     $map = "maps/" . $maps[sizeof($maps)-1];
                 } else {
+                    $rawmap = urldecode($maps[array_rand($maps)]);
                     $map = "maps/" . urldecode($maps[array_rand($maps)]); // $maps[0];
                 }
             }
@@ -95,7 +100,7 @@
     <script src="assets/js/cookieman.js"></script>
     
     <link rel="stylesheet" type="text/css" href="assets/css/main.css">
-
+    <link rel="stylesheet" type="text/css" href="assets/css/calibrate.css">
     <style>
         #image {
             image-rendering: optimizeSpeed;             /* STOP SMOOTHING, GIVE ME SPEED  */
@@ -123,6 +128,8 @@
         <div id="cmdSace" onClick="saveCmd()" class="btn"><i class="fas fa-save"></i></div>
         <div id="cmdHelp" onClick="helpShow()" class="btn"><i class="fas fa-info-circle"></i></div>
         <div id="cmdSettings" onClick="settingsShow()" class="btn"><i class="fas fa-cog"></i></div>
+        <br>
+        <div id="cmdSettings" onClick="switchMode('<?=$rawmap?>')" class="btn"><i class="fas fa-map"></i></div>
     </div>
 
     <div id="mapname"><?=basename($map);?> / <?=$left;?> remaining</div>
@@ -651,6 +658,12 @@
 
     window.onresize = function() {
         updateMinimap();
+    };
+
+    function switchMode(mapname) {
+        if (confirm("Switch to map calibration mode?")) {
+            window.location = "calibrate2.php?map=" + mapname;
+        }
     };
 </script>
 </html>

@@ -23,4 +23,9 @@ define("CFG_PROJECT_DIR", ""); // active project dir (relative to this file)
 define("CFG_COORD_FORMAT", "DM"); // D - dd.ddd |other - dd mm.mmm
 define("CFG_VALIDATE", True); // Should save validate positions
 
+define("CFG_OFFSET_LAT", 0);
+define("CFG_OFFSET_LON", 0);
+
+define("CFG_GDALINFO_PATH", "10.99.1.105/gdalinfo.php"); // TODO: Replace with js homography.
+
 ?>

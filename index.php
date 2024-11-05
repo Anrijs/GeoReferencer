@@ -10,7 +10,7 @@
         src="https://code.jquery.com/jquery-3.4.1.min.js"
         integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
         crossorigin="anonymous"></script>
-    <script src="https://kit.fontawesome.com/3ea830fc8d.js" crossorigin="anonymous"></script>
+    <script src="assets/js/fa.js" crossorigin="anonymous"></script>
     <script src="assets/js/mapbbox.js"></script>
     <script src="assets/js/cookieman.js"></script>
 
@@ -57,6 +57,11 @@
             color: #f44336;
         }
 
+        .txt-ignore {
+            color: #666;
+            font-size: 0.9em;
+        }
+
         pre {
             background-color: #eee;
             font-family: 'Courier New', Courier, monospace;
@@ -78,10 +83,14 @@
 
             $donecount = sizeof($done) . "/" . sizeof($maps);
 
-            echo "<h3><a href=\"calibrate.php\">Start calibrating maps</a></h3>";
-            echo "<small><a href=\"calibrate.php?sq\">sq</a> | <a href=\"calibrate.php?rsq\">rsq</a></small><br><br>";
-            echo "<a href=\"mkmap.php\">Generate .map files</a><br><br>";
-            /*if (TrueCFG_FILE_MODIFY_ALLOWED)*/ echo "<a href=\"upload.php\">Upload map images</a><br><br>";
+            echo "<h3><a href=\"calibrate.php\">Calibrate with coordinates</a></h3>";
+            echo "<small><a href=\"calibrate.php?sq\">sequentially</a> | <a href=\"calibrate.php?rsq\">reverse sequentially</a></small><br><br>";
+
+            echo "<h3><a href=\"calibrate2.php\">Calibrate using map</a></h3>";
+            echo "<br>";
+
+            echo "<a href=\"mkmap.php\">Generate .map/.gcp files</a><br><br>";
+            if (CFG_FILE_MODIFY_ALLOWED) echo "<a href=\"upload.php\">Upload map images</a><br><br>";
             echo "<a href=\"map.php\">View calibration bbox in map</a><br>";
 
             echo "<hr class=\"alt\">";
@@ -94,7 +103,7 @@
             echo "<th>Original</th>\n";
             echo "<th>Calib</th>\n";
             echo "<th>.map</th>\n";
-            /*if (TrueCFG_FILE_MODIFY_ALLOWED)*/ echo "<th></th>\n";
+            if (CFG_FILE_MODIFY_ALLOWED) echo "<th></th>\n";
 
             echo "</tr>\n";
 
@@ -103,17 +112,49 @@
 
             $readyPngCmds = array();
             $readTifCmds = array();
+            $warpCmds = array();
+            $exifCmds = array();
 
             foreach ($maps as $map) {
                 $name = preg_replace('/\\.[^.\\s]{3,4}$/', '', $map);
 
                 $don = FALSE;
                 $dot = FALSE;
+                $donc = "";
+
+                $corners = FALSE;
 
                 foreach ($done as $d) {
                     $dname = preg_replace('/\\.[^.\\s]{3,4}$/', '', $d["name"]);
                     if ($dname == $name) {
                         $don = $d;
+                        $corners = array_key_exists("corners", $d) && $d["corners"];
+                        if ($corners) $donc = ' <i class="fas fa-expand"></i>';
+
+                        if (!isset($d["warp"])) continue;
+
+                        $h = $d["warp"]["srch"];
+                        $w = $d["warp"]["srcw"];
+
+                        $defpts = array(
+                            array(0,0),
+                            array($w-1,0),
+                            array($w-1,$h-1),
+                            array(0,$h-1),
+                            array($h-1,0),
+                            array($h-1,$w-1),
+                            array(0,$w-1),
+                        );
+                        
+                        $isdef = true;
+                        foreach ($d["cutline"] as $cut) {
+                            if (!in_array($cut, $defpts)) {
+                                $isdef = false;
+                                $donc .= ' <i class="fas fa-cut"></i>';
+                                break;
+                            }
+                        }
+                        
                         break;
                     }
                 }
@@ -129,15 +170,23 @@
 
                 $origurl = "<a href=\"maps/$map\" download>Download</a>";                
                 $doturl = "<a href=\"maps/$dot\" class=\"txt-yes\">.map</a>";
-                $editurl = "<a href=\"calibrate.php?map=$map\">check</a>";
+                if ($corners) {
+                    $editurl = "<a href=\"calibrate2.php?map=$map\">check</a>";
+                } else {
+                    $editurl = "<a href=\"calibrate.php?map=$map\">check</a>";
+                }
                 $rmurl = "<a onclick=\"return confirm('Confirm $map delete');\" href=\"delete.php?map=$map\">Delete</a>";
 
                 echo "<tr>\n";
 
 
                 echo "<td>" . $name . " <small>[" . $editurl . "]</small></td>\n";
-                echo "<td>$origurl</td>\n";                
-                echo "<td>" . ($don ? $strY : $strN) . "</td>\n";
+                echo "<td>$origurl</td>\n";
+                if ($don && array_key_exists("igonre", $don) && $don["igonre"] == "true") {
+                    echo "<td><b class=\"txt-ignore\">Igonre</b></td>\n";
+                } else {
+                    echo "<td>" . ($don ? $strY : $strN) . $donc ."</td>\n";
+                }
                 echo "<td>" . ($dot ? $doturl : " - ") . "</td>\n";
                 /*if (TrueCFG_FILE_MODIFY_ALLOWED)*/ echo "<td><small>[" . $rmurl . "]</small></td>\n";
 
@@ -167,6 +216,7 @@
             echo "<hr class=\"alt\">";
 
             if (isset($_GET["cmds"])) {
+                // sacle should modify only warp src-dst px coords and toPng polygon px coords.
                 $scale = 1.0;
 
                 if (isset($_GET["scale"])) {
@@ -178,8 +228,13 @@
                     $parts = explode(" ",$name);
                     $sane = $parts[0];
     
-                    $readyPngCmds[] = getToPngCmd($don, $scale, FALSE, "pngs/" . $sane);
-                    $readTifCmds[] = getToTifCmd($don);
+                    if ($don["corners"]) {
+                        $warpCmds[] = getWarpCmd($don, $scale, FALSE, "warp/" . $sane);
+                    } else {
+                        $readyPngCmds[] = getToPngCmd($don, $scale, FALSE, "pngs/" . $sane);
+                    }
+
+                    //$readTifCmds[] = getToTifCmd($don);
                 }
 
                 echo "<a href=\"?\">Hide commands</a><br><br>";
@@ -191,12 +246,44 @@
                 }
                 echo "</pre><br>";
 
+                echo "<h3>WARP commands <small>(Scale: $scale)</small></h3>";
+                echo "<pre>";
+                foreach ($warpCmds as $cmd) {
+                    if (strlen($cmd[0]) > 0) {
+                        echo $cmd[0] . "\n";
+                    }
+                }
+                echo "</pre><br>";
+
+
+/*
+                echo "<h3>WARP Translate ommands</h3>";
+                echo "<pre>";
+                foreach ($warpCmds as $cmd) {
+                    if (strlen($cmd[1]) > 0) {
+                        echo $cmd[1] . "\n";
+                    }
+                }
+                echo "</pre><br>";
+
+
                 echo "<h3>src MAP -> TIF commands</h3>";
                 echo "<pre>";
                 foreach ($readTifCmds as $cmd) {
                     echo $cmd . "\n";
                 }
                 echo "</pre><br>";
+
+                echo "<h3>Ordered by map area (Largest first)</h3>";
+                echo "<pre>";
+
+                usort($done, "cmpMapArea");
+                foreach ($done as $d) {
+                    echo $d["name"] . "\n";
+                }
+
+                echo "</pre><br>";
+*/
             } else {
                 echo "<a href=\"?cmds\">Show commands</a><br><br>";
             }

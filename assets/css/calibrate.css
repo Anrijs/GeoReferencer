@@ -1,0 +1,99 @@
+#pointer1, #pointer2, #pointer3, #pointer4 {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#image {
+    image-rendering: optimizeSpeed;             /* STOP SMOOTHING, GIVE ME SPEED  */
+    image-rendering: -moz-crisp-edges;          /* Firefox                        */
+    image-rendering: -o-crisp-edges;            /* Opera                          */
+    image-rendering: -webkit-optimize-contrast; /* Chrome (and eventually Safari) */
+    image-rendering: pixelated;                 /* Chrome */
+    image-rendering: optimize-contrast;         /* CSS3 Proposed                  */
+}
+    
+.noselect {
+    -webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Safari */
+    -khtml-user-select: none; /* Konqueror HTML */
+    -moz-user-select: none; /* Old versions of Firefox */
+    -ms-user-select: none; /* Internet Explorer/Edge */
+    user-select: none; /* Non-prefixed version, currently supported by Chrome, Opera and Firefox */
+}
+
+#canvas {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    z-index: 99998;
+}
+
+#toolbar {
+    position: fixed;
+    top: 60;
+    left: 0;
+    background: rgba(255, 255, 255, 0.8);
+    padding: 4px;
+    width: 36px;
+    z-index: 99998;
+    border: solid 1px #ddd;
+}
+
+#mapname {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    background: rgba(255, 255, 255, 0.8);
+    padding: 2px;
+    z-index: 99999;
+    font-size: 12px;
+    font-family: 'Courier New', Courier, monospace;
+    border: solid 1px #ddd;
+}
+
+#help {
+    position: fixed;
+    top: 0;
+    left:47px;
+    background: #fff;
+    padding: 4px;
+    z-index: 99999;
+    padding: 12px;
+    border: solid 1px #ddd;
+}
+
+#settings {
+    position: fixed;
+    top: 0;
+    left:47px;
+    background: #fff;
+    padding: 4px;
+    z-index: 99999;
+    padding: 12px;
+    border: solid 1px #ddd;
+}
+
+.pointer-coords {
+    z-index: 9998;
+    background: rgba(255, 255, 255, 0.5);
+    padding: 4px;
+    width: 160px;
+    border: solid 1px rgba(120, 120, 120, 0.5);
+}
+
+#image-map {
+    width: 50%;
+    height: 100%;
+    left: 0;
+    top: 0;
+    position: absolute;
+}
+
+#map-map {
+    width: 50%;
+    height: 100%;
+    left: 50%;
+    top: 0;
+    position: absolute;
+}

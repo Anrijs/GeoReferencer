@@ -12,12 +12,15 @@
     if (isset($_POST["filename"]) && isset($_POST["points"])) {
         $filename = urldecode($_POST["filename"]);
         $points = $_POST["points"];
-        
+        $warp = $_POST["warp"];
+        $corners = $_POST["corners"];
+        $cutline = $_POST["cutline"];
+
         // validate points
         if (CFG_VALIDATE) {
             $ptid = 1;
             foreach ($points as $pt) {
-                if ($pt["x"] <= 1 && $pt["y"] <= -1) {
+                if ($pt["x"] == -1 && $pt["y"] == -1) {
                     die("invalid calibration point #${ptid} location");
                     return;
                 }
@@ -33,16 +36,23 @@
             }
         }
 
-        $maps = getDoneMaps(True);
+        $maps = getDoneMaps();
         $exists = FALSE;
 
         $obj = array(
             "name" => $filename,
             "points" => $points,
+            "corners" => $corners,
+            "warp" => $warp,
+            "cutline" => $cutline
         );
+
+        $updated = date("Y-m-d H:i:s");
+        $created = $updated;
 
         foreach ($maps as $key => $v) {
             if ($v["name"] == $filename) {
+                $obj["updated"] = $updated;
                 $maps[$key] = $obj;
                 $exists = TRUE;
                 break;
@@ -50,6 +60,8 @@
         }
 
         if (!$exists) {
+            $obj["created"] = $created;
+            $obj["updated"] = $updated;
             $maps[] = $obj;
         }
 

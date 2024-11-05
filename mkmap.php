@@ -18,7 +18,7 @@
 
 include "lib/fn.php";
 
-$maps = getDoneMaps(!isset($_GET["existing"]));
+$maps = getDoneMaps();
 
 $warnas = array();
 
@@ -26,6 +26,17 @@ $ext = "png";
 if (isset($_GET["ext"])) {
     $ext = $_GET["ext"];
     $scale = 1.0;
+
+    $warped = False;
+    $gcp = False;
+
+    if (isset($_GET["warped"])) {
+        $warped = $_GET["warped"];
+    }
+
+    if (isset($_GET["gcp"])) {
+        $gcp = $_GET["gcp"];
+    }
 
     if (isset($_GET["scale"])) {
         $scale = floatval($_GET["scale"]);
@@ -41,7 +52,7 @@ if (isset($_GET["ext"])) {
                 continue;
             }
         }
-        $str = generateMapFile($map, $scale);
+        $str = generateMapFile($map, $scale, $warped);
         $str = str_replace(".tif", ".$ext", $str);
 
         if (CFG_VALIDATE) {
@@ -64,6 +75,17 @@ if (isset($_GET["ext"])) {
             fclose($myfile);
             echo "Created map calibration: <i><a href=\"maps/".$mapname."\">" . $mapname . "</a></i><br>\n";
         }
+
+        if ($gcp) {
+            $gcpname =  $map["name"] . ".points";
+
+            $gcpstr = generateGcpFile($map, $scale);
+
+            $myfile = fopen("maps/" . $gcpname, "w") or die("Unable to open file!");
+            fwrite($myfile, $gcpstr);
+            fclose($myfile);
+            echo "Created map calibration: <i><a href=\"maps/".$gcpname."\">" . $gcpname . "</a></i><br>\n";
+        }
     }
 
     if (sizeof($errors) > 0) {
@@ -74,9 +96,13 @@ if (isset($_GET["ext"])) {
     <form method="get">
         <label for="ext">Image file extension</label><br>
         <input type="text" id="ext" name="ext"><br>
+
         <label for="scale">Image scale</label><br>
         <input type="number" id="scale" name="scale" value="1.0"><br>
-        <input type="checkbox" id="existing" name="existing" checked><label for="existing">Only for existing images</label><br>
+
+        <label for="warped"><input type="checkbox" id="warped" name="warped" checked>Generate for warped images (if available)</label><br>
+        <label for="gcp"><input type="checkbox" id="gcp" name="gcp">Generate GCP files</label><br>
+
         <input type="submit">
     </form>
 <?php } ?>

@@ -18,16 +18,19 @@
         require_once "config.php";
 
         if(CFG_FILE_MODIFY_ALLOWED) {
-            $total = count($_FILES['upload']['name']);
+            $total = 0;
+            if (isset($_FILES) && isset($_FILES['upload'])) {
+                $total = count($_FILES['upload']['name']);
+            }
             $ups = 0;
             $fails = 0;
             $errors = array();
             // Loop through each file
             for( $i=0 ; $i < $total ; $i++ ) {
-            
+
             //Get the temp file path
             $tmpFilePath = $_FILES['upload']['tmp_name'][$i];
-            
+
             //Make sure we have a file path
             if ($tmpFilePath != ""){
                 //Setup our new file path
@@ -64,10 +67,9 @@
                 echo sizeof($errors) . " failed.<br>";
                 echo "<hr class=\"alt\">";
             }
-        
         ?>
         <a href="index.php">Check status</a><br><br>
-        
+
         <h3>Upload image files</h3>
         <small>Suppoerted formats: jpg, png, gif</small>
         <hr class="alt">
